@@ -14,6 +14,7 @@ import (
 func main() {
 
 	model := flag.String("m", "gpt-4", "the model to use")
+	temperature := flag.Float64("t", 0.7, "the temperature to use (see <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: äh [flags] <prompt>\n")
 		flag.PrintDefaults()
@@ -50,7 +51,7 @@ func main() {
 			"role":    "user",
 			"content": prompt,
 		}},
-		"temperature": 0.7,
+		"temperature": *temperature,
 	}
 	requestBodyBytes, _ := json.Marshal(requestBodyData)
 	requestBodyReader := bytes.NewReader(requestBodyBytes)
