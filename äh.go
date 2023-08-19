@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -122,7 +123,27 @@ func main() {
 
 	responseBodyMap := make(map[string]any)
 	json.Unmarshal(responseBodyBytes, &responseBodyMap)
-	gptAnswer := responseBodyMap["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)["content"].(string)
+
+	// try to get the answer, but recover from any panic this may cause
+	var gptAnswer string
+	var model string
+	var totalTokensUsed int
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "response is not of expected shape (%v)\n", r)
+				resp.Write(os.Stderr)
+				os.Exit(1)
+			}
+		}()
+		gptAnswer = responseBodyMap["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)["content"].(string)
+		model = responseBodyMap["model"].(string)
+		totalTokensUsed = int(math.Round(responseBodyMap["usage"].(map[string]any)["total_tokens"].(float64)))
+	}()
+
 	fmt.Println(gptAnswer)
+
+	fmt.Fprintf(os.Stderr, "model: %s\n", model)
+	fmt.Fprintf(os.Stderr, "total tokens used: %d\n", totalTokensUsed)
 
 }
