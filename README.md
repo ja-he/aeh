@@ -20,7 +20,29 @@ go install äh.go
 
 ## Usage
 
-See `go run äh.go -h`.
+For example:
+```
+$ äh "A Haiku on linear programming"
+remaining requests: 199
+remaining tokens: 9975
+Optimizing lines,
+Boundaries clearly defined,
+Solutions we find.
+model: gpt-4-0613
+total tokens used: 28
+```
+
+You can get rid of those extra lines by simply redirecting STDERR:
+```
+$ äh "A limerick about Langton's ant" 2> /dev/null
+Langton's ant, quite a curious sight
+Moves in a grid, left or right
+Black to white, white to black
+Never does it look back
+In its algorithmic, infinite flight.
+```
+
+For more, see `äh -h`.
 
 ## Why not call it 'hmm' so it could be typed on more Keyboards?
 
