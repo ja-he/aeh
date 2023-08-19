@@ -13,9 +13,19 @@ import (
 
 func main() {
 
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: äh [flags] <prompt>\n")
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 	prompt := flag.Arg(0)
 	strings.ReplaceAll(prompt, `"`, `\"`)
+	if prompt == "" {
+		fmt.Fprintf(os.Stderr, "no prompt given\n")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	// we will make a POST request corresponding to this cURL command:
 	//
