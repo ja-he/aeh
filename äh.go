@@ -43,7 +43,8 @@ func main() {
 		body,
 	)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "error creating HTTP request (%s)\n", err.Error())
+		os.Exit(1)
 	}
 	// set the request headers
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("OPENAI_API_KEY")))
@@ -52,7 +53,8 @@ func main() {
 	// send via default http client
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "error doing HTTP request (%s)\n", err.Error())
+		os.Exit(1)
 	}
 
 	resp.Write(os.Stdout)
