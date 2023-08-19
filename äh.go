@@ -103,6 +103,11 @@ func main() {
 	//    }
 	//  }
 
+	if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(os.Stderr, "received non-200 HTTP-status-code (%d)\n", resp.StatusCode)
+		resp.Write(os.Stderr)
+		os.Exit(1)
+	}
 
 	responseBodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
