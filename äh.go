@@ -109,6 +109,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	remainingRequests := resp.Header.Get("X-Ratelimit-Remaining-Requests")
+	remainingTokens := resp.Header.Get("X-Ratelimit-Remaining-Tokens")
+	fmt.Fprintf(os.Stderr, "remaining requests: %s\n", remainingRequests)
+	fmt.Fprintf(os.Stderr, "remaining tokens: %s\n", remainingTokens)
+
 	responseBodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error reading HTTP response body (%s)\n", err.Error())
