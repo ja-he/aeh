@@ -1,3 +1,6 @@
+// Package is a command-line utility for calling LLM APIs, currently only the
+// OpenAI API.
+// It is intended to be simple and straightforward first and foremost.
 package main
 
 import (
