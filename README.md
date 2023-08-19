@@ -2,6 +2,11 @@
 
 Just a simple front for calling out to LLM APIs, right now only the OpenAI-API.
 
+## Scope
+
+Just for my personal use.
+I like [`mods`](https://github.com/charmbracelet/mods) for some things but I found it a touch intransparent in which model it actually uses and wanted something super-simple that basically just stripped the JSON-cruft around the actual answer in a not-completely-shabby way.
+
 ## Building / Installing
 
 It's Go, so you need `go`.
