@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -8,11 +9,11 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"strings"
 )
 
 func main() {
 
+	model := flag.String("m", "gpt-4", "the model to use")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: äh [flags] <prompt>\n")
 		flag.PrintDefaults()
@@ -20,7 +21,6 @@ func main() {
 
 	flag.Parse()
 	prompt := flag.Arg(0)
-	strings.ReplaceAll(prompt, `"`, `\"`)
 	if prompt == "" {
 		fmt.Fprintf(os.Stderr, "no prompt given\n")
 		flag.Usage()
@@ -44,16 +44,22 @@ func main() {
 	//         }'
 
 	// create a new request body
-	body := strings.NewReader(fmt.Sprintf(
-		`{"model":"gpt-4","messages":[{"role":"user","content":"%s"}],"temperature":0.7}`,
-		prompt,
-	))
+	requestBodyData := map[string]any{
+		"model": *model,
+		"messages": []map[string]string{{
+			"role":    "user",
+			"content": prompt,
+		}},
+		"temperature": 0.7,
+	}
+	requestBodyBytes, _ := json.Marshal(requestBodyData)
+	requestBodyReader := bytes.NewReader(requestBodyBytes)
 
 	// create a new request with JSON body data
 	req, err := http.NewRequest(
 		"POST",
 		"https://api.openai.com/v1/chat/completions",
-		body,
+		requestBodyReader,
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating HTTP request (%s)\n", err.Error())
@@ -136,7 +142,7 @@ func main() {
 
 	// try to get the answer, but recover from any panic this may cause
 	var gptAnswer string
-	var model string
+	var modelResponding string
 	var totalTokensUsed int
 	func() {
 		defer func() {
@@ -147,13 +153,13 @@ func main() {
 			}
 		}()
 		gptAnswer = responseBodyMap["choices"].([]any)[0].(map[string]any)["message"].(map[string]any)["content"].(string)
-		model = responseBodyMap["model"].(string)
+		modelResponding = responseBodyMap["model"].(string)
 		totalTokensUsed = int(math.Round(responseBodyMap["usage"].(map[string]any)["total_tokens"].(float64)))
 	}()
 
 	fmt.Println(gptAnswer)
 
-	fmt.Fprintf(os.Stderr, "model: %s\n", model)
+	fmt.Fprintf(os.Stderr, "model: %s\n", modelResponding)
 	fmt.Fprintf(os.Stderr, "total tokens used: %d\n", totalTokensUsed)
 
 }
