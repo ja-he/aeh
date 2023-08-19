@@ -21,3 +21,7 @@ go install äh.go
 ## Usage
 
 See `go run äh.go -h`.
+
+## Why not call it 'hmm' so it could be typed on more Keyboards?
+
+äh...
