@@ -40,6 +40,11 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	if len(flag.Args()) > 1 {
+		errorf("additional command line (non-flag) arguments specified, which is invalid")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	// we will make a POST request corresponding to this cURL command:
 	//
