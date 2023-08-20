@@ -12,21 +12,31 @@ import (
 	"math"
 	"net/http"
 	"os"
+
+	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 )
 
 func main() {
 
+	var errorf func(msg string, args ...any)
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		errorf = func(msg string, args ...any) { color.New(color.FgYellow).Fprintf(os.Stderr, msg, args...) }
+	} else {
+		errorf = func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
+	}
+
 	model := flag.String("m", "gpt-4", "the model to use")
 	temperature := flag.Float64("t", 0.7, "the temperature to use (see <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>)")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: äh [flags] <prompt>\n")
+		errorf("usage: äh [flags] <prompt>\n")
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
 	prompt := flag.Arg(0)
 	if prompt == "" {
-		fmt.Fprintf(os.Stderr, "no prompt given\n")
+		errorf("no prompt given\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -66,7 +76,7 @@ func main() {
 		requestBodyReader,
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating HTTP request (%s)\n", err.Error())
+		errorf("error creating HTTP request (%s)\n", err.Error())
 		os.Exit(1)
 	}
 	// set the request headers
@@ -76,7 +86,7 @@ func main() {
 	// send via default http client
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error doing HTTP request (%s)\n", err.Error())
+		errorf("error doing HTTP request (%s)\n", err.Error())
 		os.Exit(1)
 	}
 
@@ -125,19 +135,19 @@ func main() {
 	//  }
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "received non-200 HTTP-status-code (%d)\n", resp.StatusCode)
+		errorf("received non-200 HTTP-status-code (%d)\n", resp.StatusCode)
 		resp.Write(os.Stderr)
 		os.Exit(1)
 	}
 
 	remainingRequests := resp.Header.Get("X-Ratelimit-Remaining-Requests")
 	remainingTokens := resp.Header.Get("X-Ratelimit-Remaining-Tokens")
-	fmt.Fprintf(os.Stderr, "remaining requests: %s\n", remainingRequests)
-	fmt.Fprintf(os.Stderr, "remaining tokens: %s\n", remainingTokens)
+	errorf("remaining requests: %s\n", remainingRequests)
+	errorf("remaining tokens: %s\n", remainingTokens)
 
 	responseBodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading HTTP response body (%s)\n", err.Error())
+		errorf("error reading HTTP response body (%s)\n", err.Error())
 		os.Exit(1)
 	}
 
@@ -151,7 +161,7 @@ func main() {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "response is not of expected shape (%v)\n", r)
+				errorf("response is not of expected shape (%v)\n", r)
 				resp.Write(os.Stderr)
 				os.Exit(1)
 			}
@@ -163,7 +173,7 @@ func main() {
 
 	fmt.Println(gptAnswer)
 
-	fmt.Fprintf(os.Stderr, "model: %s\n", modelResponding)
-	fmt.Fprintf(os.Stderr, "total tokens used: %d\n", totalTokensUsed)
+	errorf("model: %s\n", modelResponding)
+	errorf("total tokens used: %d\n", totalTokensUsed)
 
 }
