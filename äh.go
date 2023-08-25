@@ -46,6 +46,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	if !isatty.IsTerminal(os.Stdin.Fd()) {
+		if stdinInput, err := io.ReadAll(os.Stdin); err != nil {
+			errorf("could not read from STDIN (%s)\n", err.Error())
+			os.Exit(1)
+		} else if len(stdinInput) > 0 {
+			// append the STDIN input to the prompt (if any) with a newline in between
+			prompt += "\n\n"
+			prompt += string(stdinInput)
+		}
+	}
+
 	// we will make a POST request corresponding to this cURL command:
 	//
 	//   curl https://api.openai.com/v1/chat/completions \
