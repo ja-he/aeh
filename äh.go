@@ -12,6 +12,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
@@ -20,7 +21,8 @@ import (
 func main() {
 
 	var errorf func(msg string, args ...any)
-	if isatty.IsTerminal(os.Stderr.Fd()) {
+	stderrATTY := isatty.IsTerminal(os.Stderr.Fd())
+	if stderrATTY {
 		errorf = func(msg string, args ...any) { color.New(color.FgYellow).Fprintf(os.Stderr, msg, args...) }
 	} else {
 		errorf = func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
@@ -99,8 +101,24 @@ func main() {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("OPENAI_API_KEY")))
 	req.Header.Set("Content-Type", "application/json")
 
+	spinner := spinner{
+		Iterations: []string{`🌑`, `🌘`, `🌗`, `🌕`, `🌔`, `🌓`, `🌒`},
+		Frequency:  100 * time.Millisecond,
+		PrintFn: func() func(string, ...any) {
+			if stderrATTY {
+				return errorf
+			} else {
+				return func(msg string, args ...any) {}
+			}
+		}(),
+	}
+	waitDone := make(chan struct{})
+	spinnerDone := spinner.Spin(waitDone)
+
 	// send via default http client
 	resp, err := http.DefaultClient.Do(req)
+	close(waitDone)
+	<-spinnerDone
 	if err != nil {
 		errorf("error doing HTTP request (%s)\n", err.Error())
 		os.Exit(1)
@@ -192,4 +210,31 @@ func main() {
 	errorf("model: %s\n", modelResponding)
 	errorf("total tokens used: %d\n", totalTokensUsed)
 
+}
+
+type spinner struct {
+	Iterations []string
+	Frequency  time.Duration
+	PrintFn    func(string, ...any)
+}
+
+func (s *spinner) Spin(terminator <-chan struct{}) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(s.Frequency)
+		iterIndex := 0
+		s.PrintFn("\033[?25l")
+		defer s.PrintFn("\033[?25h")
+		for {
+			select {
+			case <-terminator:
+				close(done)
+				return
+			case <-ticker.C:
+				s.PrintFn("\r%s", s.Iterations[iterIndex])
+				iterIndex = (iterIndex + 1) % len(s.Iterations)
+			}
+		}
+	}()
+	return done
 }
