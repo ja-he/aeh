@@ -12,6 +12,8 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -59,6 +61,31 @@ func main() {
 		}
 	}
 
+	// create a simple spinner
+	spinner := NewSpinner(
+		[]string{`🌑`, `🌘`, `🌗`, `🌕`, `🌔`, `🌓`, `🌒`},
+		100*time.Millisecond,
+		func() func(string, ...any) {
+			if stderrATTY {
+				return errorf
+			} else {
+				return func(msg string, args ...any) {}
+			}
+		}(),
+	)
+
+	// catch SIGINT and SIGTERM
+	// (SIGTERM is sent by `kill` by default and SIGINT by `Ctrl+C`)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range sigs {
+			spinner.Stop()
+			errorf("received signal %s\n", sig)
+			os.Exit(1)
+		}
+	}()
+
 	// we will make a POST request corresponding to this cURL command:
 	//
 	//   curl https://api.openai.com/v1/chat/completions \
@@ -101,17 +128,6 @@ func main() {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("OPENAI_API_KEY")))
 	req.Header.Set("Content-Type", "application/json")
 
-	spinner := spinner{
-		Iterations: []string{`🌑`, `🌘`, `🌗`, `🌕`, `🌔`, `🌓`, `🌒`},
-		Frequency:  100 * time.Millisecond,
-		PrintFn: func() func(string, ...any) {
-			if stderrATTY {
-				return errorf
-			} else {
-				return func(msg string, args ...any) {}
-			}
-		}(),
-	}
 	waitDone := make(chan struct{})
 	spinnerDone := spinner.Spin(waitDone)
 
@@ -212,29 +228,52 @@ func main() {
 
 }
 
-type spinner struct {
-	Iterations []string
-	Frequency  time.Duration
-	PrintFn    func(string, ...any)
+type Spinner struct {
+	iterations         []string
+	frequency          time.Duration
+	printFn            func(string, ...any)
+	internalTerminator chan string
 }
 
-func (s *spinner) Spin(terminator <-chan struct{}) <-chan struct{} {
+func NewSpinner(
+	iterations []string,
+	frequency time.Duration,
+	printFn func(string, ...any),
+) *Spinner {
+	return &Spinner{
+		iterations:         iterations,
+		frequency:          frequency,
+		printFn:            printFn,
+		internalTerminator: make(chan string),
+	}
+}
+
+func (s *Spinner) Spin(terminator <-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(s.Frequency)
+		defer close(s.internalTerminator)
+		defer s.printFn("\r                      \r") // clear the line
+		ticker := time.NewTicker(s.frequency)
 		iterIndex := 0
-		s.PrintFn("\033[?25l")
-		defer s.PrintFn("\033[?25h")
+		s.printFn("\033[?25l")
+		defer s.printFn("\033[?25h")
 		for {
 			select {
 			case <-terminator:
 				close(done)
 				return
+			case <-s.internalTerminator:
+				return
 			case <-ticker.C:
-				s.PrintFn("\r%s", s.Iterations[iterIndex])
-				iterIndex = (iterIndex + 1) % len(s.Iterations)
+				s.printFn("\r%s", s.iterations[iterIndex])
+				iterIndex = (iterIndex + 1) % len(s.iterations)
 			}
 		}
 	}()
 	return done
+}
+
+func (s *Spinner) Stop() {
+	s.internalTerminator <- "stop requested"
+	<-s.internalTerminator
 }
