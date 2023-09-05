@@ -61,6 +61,12 @@ func main() {
 		}
 	}
 
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		errorf("OPENAI_API_KEY environment variable not set\n")
+		os.Exit(1)
+	}
+
 	// create a simple spinner
 	spinner := NewSpinner(
 		[]string{`🌑`, `🌘`, `🌗`, `🌕`, `🌔`, `🌓`, `🌒`},
@@ -125,7 +131,7 @@ func main() {
 		os.Exit(1)
 	}
 	// set the request headers
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", os.Getenv("OPENAI_API_KEY")))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Set("Content-Type", "application/json")
 
 	waitDone := make(chan struct{})
