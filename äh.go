@@ -234,6 +234,8 @@ func main() {
 
 }
 
+// Spinner is a simple spinner that can be used to indicate that something is
+// currently happening.
 type Spinner struct {
 	iterations         []string
 	frequency          time.Duration
@@ -241,6 +243,8 @@ type Spinner struct {
 	internalTerminator chan string
 }
 
+// NewSpinner creates a new Spinner with the given iterations, frequency and
+// print function.
 func NewSpinner(
 	iterations []string,
 	frequency time.Duration,
@@ -254,6 +258,8 @@ func NewSpinner(
 	}
 }
 
+// Spin starts the spinner and returns a channel that will be closed when the
+// spinner is stopped.
 func (s *Spinner) Spin(terminator <-chan struct{}) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
@@ -279,6 +285,7 @@ func (s *Spinner) Spin(terminator <-chan struct{}) <-chan struct{} {
 	return done
 }
 
+// Stop stops the spinner.
 func (s *Spinner) Stop() {
 	s.internalTerminator <- "stop requested"
 	<-s.internalTerminator
