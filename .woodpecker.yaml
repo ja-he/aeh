@@ -1,0 +1,6 @@
+steps:
+
+  - name: dummy
+    image: localhost:45000/rust-ubuntu-stable:latest
+    commands:
+      - echo "Hello!"
