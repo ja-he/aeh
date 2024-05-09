@@ -276,7 +276,10 @@ func queryGPT(model, token, prompt string, temperature float64, spinner *Spinner
 	}
 
 	responseBodyMap := make(map[string]any)
-	json.Unmarshal(responseBodyBytes, &responseBodyMap)
+	if err := json.Unmarshal(responseBodyBytes, &responseBodyMap); err != nil {
+		errorf("error unmarshaling response body (%s)\n", err.Error())
+		os.Exit(1)
+	}
 
 	// try to get the answer, but recover from any panic this may cause
 	var gptAnswer string
