@@ -114,7 +114,7 @@ func main() {
 	gptAnswer, err := queryGPT(*model, apiKey, prompt, *temperature, spinner)
 	if err != nil {
 		errorf("error querying:\n")
-		errorf(err.Error()+"\n")
+		errorf(err.Error() + "\n")
 		os.Exit(1)
 	}
 
@@ -297,7 +297,6 @@ func queryGPT(model, token, prompt string, temperature float64, spinner *Spinner
 		modelResponding = responseBodyMap["model"].(string)
 		totalTokensUsed = int(math.Round(responseBodyMap["usage"].(map[string]any)["total_tokens"].(float64)))
 	}()
-
 
 	errorf("model: %s\n", modelResponding)
 	errorf("total tokens used: %d\n", totalTokensUsed)
