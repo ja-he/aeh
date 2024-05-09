@@ -28,7 +28,7 @@ func main() {
 	if stderrATTY && os.Getenv("AEH_ERR") != "false" {
 		errorf = func(msg string, args ...any) { color.New(color.FgYellow).Fprintf(os.Stderr, msg, args...) }
 	} else if os.Getenv("AEH_ERR") == "false" {
-		errorf = func(msg string, args ...any) {}
+		errorf = func(_ string, _ ...any) {}
 	} else {
 		errorf = func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
 	}
