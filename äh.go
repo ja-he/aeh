@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 	"time"
 
@@ -63,6 +64,20 @@ func main() {
 			prompt += string(stdinInput)
 		}
 	}
+
+	configDir := func() string {
+		if alreadyConfiguredDir := os.Getenv("AEH_CONFIG_DIR"); alreadyConfiguredDir != "" {
+			return alreadyConfiguredDir
+		}
+		if configDir := os.Getenv("XDG_CONFIG_DIR"); configDir != "" {
+			return path.Join(configDir, "äh")
+		}
+		if homeDir := os.Getenv("HOME"); homeDir != "" {
+			return path.Join(homeDir, ".config", "äh")
+		}
+		return "./äh"
+	}()
+	historyFile := path.Join(configDir, "history.json")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -119,6 +134,34 @@ func main() {
 	}
 
 	fmt.Println(gptAnswer)
+
+	// marshal the prompt and response to JSON and append it to the history file
+	if s, err := os.Stat(configDir); os.IsNotExist(err) {
+		os.Mkdir(configDir, 0700)
+	} else if !s.IsDir() {
+		errorf("config dir '%s' exists but is not a directory\n", configDir)
+		os.Exit(1)
+	}
+	marshaled, err := json.Marshal(PromptAndResponse{Prompt: prompt, Response: gptAnswer})
+	if err != nil {
+		// this should not happen, realistically
+		errorf("error marshaling prompt and response to JSON (%s)\n", err.Error())
+		os.Exit(1)
+	}
+	f, err := os.OpenFile(historyFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		errorf("error opening history file (%s)\n", err.Error())
+		os.Exit(1)
+	}
+	if _, err = f.Write(append(marshaled, '\n')); err != nil {
+		errorf("error writing to history file (%s)\n", err.Error())
+		os.Exit(1)
+	}
+	if err := f.Close(); err != nil {
+		errorf("error closing history file (%s)\n", err.Error())
+		os.Exit(1)
+	}
+
 }
 
 // Spinner is a simple spinner that can be used to indicate that something is
@@ -302,4 +345,10 @@ func queryGPT(model, token, prompt string, temperature float64, spinner *Spinner
 	errorf("total tokens used: %d\n", totalTokensUsed)
 
 	return gptAnswer, nil
+}
+
+// PromptAndResponse is a simple struct that holds a prompt and a response.
+type PromptAndResponse struct {
+	Prompt   string
+	Response string
 }
