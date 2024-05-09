@@ -25,8 +25,10 @@ var errorf func(msg string, args ...any)
 func main() {
 
 	stderrATTY := isatty.IsTerminal(os.Stderr.Fd())
-	if stderrATTY {
+	if stderrATTY && os.Getenv("AEH_ERR") != "false" {
 		errorf = func(msg string, args ...any) { color.New(color.FgYellow).Fprintf(os.Stderr, msg, args...) }
+	} else if os.Getenv("AEH_ERR") == "false" {
+		errorf = func(msg string, args ...any) {}
 	} else {
 		errorf = func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
 	}
@@ -73,8 +75,8 @@ func main() {
 		[]string{`🌑`, `🌘`, `🌗`, `🌕`, `🌔`, `🌓`, `🌒`},
 		100*time.Millisecond,
 		func() func(string, ...any) {
-			if stderrATTY {
-				return errorf
+			if stderrATTY && os.Getenv("AEH_SPIN") == "" || os.Getenv("AEH_SPIN") == "true" {
+				return func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
 			} else {
 				return func(msg string, args ...any) {}
 			}
