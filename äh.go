@@ -17,11 +17,34 @@ import (
 	"syscall"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 )
 
 var errorf func(msg string, args ...any)
+
+// Config is the configuration of the command-line utility.
+// It is stored and read as YAML
+type Config struct {
+	Defaults struct {
+		Model *string  `yaml:"model"`
+		Temp  *float64 `yaml:"temp"`
+	} `yaml:"defaults"`
+}
+
+// FillMissing fills in missing values in the configuration with defaults.
+func (c *Config) FillMissing() {
+	if c.Defaults.Model == nil {
+		v := "gpt-3.5-turbo"
+		c.Defaults.Model = &v
+	}
+	if c.Defaults.Temp == nil {
+		v := 0.7
+		c.Defaults.Temp = &v
+	}
+}
 
 func main() {
 
@@ -34,8 +57,67 @@ func main() {
 		errorf = func(msg string, args ...any) { fmt.Fprintf(os.Stderr, msg, args...) }
 	}
 
-	model := flag.String("m", "gpt-4", "the model to use")
-	temperature := flag.Float64("t", 0.7, "the temperature to use (see <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>)")
+	configDir := func() string {
+		if alreadyConfiguredDir := os.Getenv("AEH_CONFIG_DIR"); alreadyConfiguredDir != "" {
+			return alreadyConfiguredDir
+		}
+		if configDir := os.Getenv("XDG_CONFIG_DIR"); configDir != "" {
+			return path.Join(configDir, "äh")
+		}
+		if homeDir := os.Getenv("HOME"); homeDir != "" {
+			return path.Join(homeDir, ".config", "äh")
+		}
+		return "./äh"
+	}()
+	historyFile := path.Join(configDir, "history.json")
+	configFile := path.Join(configDir, "config.yaml")
+	ensureConfigDir := func() {
+		if s, err := os.Stat(configDir); os.IsNotExist(err) {
+			os.Mkdir(configDir, 0700)
+		} else if !s.IsDir() {
+			errorf("config dir '%s' exists but is not a directory\n", configDir)
+			os.Exit(1)
+		}
+	}
+	ensureConfigFileAndDefaultFillIfCreating := func() {
+		if s, err := os.Stat(configFile); os.IsNotExist(err) {
+			errorf("the config did not yet exist, so I am creating a default-config in this file for you to start with...\n")
+			var config Config
+			config.FillMissing()
+			configYAMLBytes, err := yaml.Marshal(config)
+			if err != nil {
+				errorf("error marshaling default config to YAML (%s)\n", err.Error())
+				os.Exit(1)
+			}
+			err = os.WriteFile(configFile, configYAMLBytes, 0600)
+			if err != nil {
+				errorf("error writing default config file (%s)\n", err.Error())
+				os.Exit(1)
+			}
+			errorf("filled dafault config at '%s'\n", configFile)
+		} else if s.IsDir() {
+			errorf("config file '%s' exists but is a directory\n", configFile)
+			errorf("please remove that directory, as it is where the config file needs to go.\n")
+			os.Exit(1)
+		}
+	}
+	ensureConfigDir()
+	ensureConfigFileAndDefaultFillIfCreating()
+
+	var config Config
+	configByteContents, err := os.ReadFile(configFile)
+	if err != nil {
+		errorf("error reading config file (%s)\n", err.Error())
+		os.Exit(1)
+	}
+	if err := yaml.Unmarshal(configByteContents, &config); err != nil {
+		errorf("error unmarshaling config file (%s)\n", err.Error())
+		os.Exit(1)
+	}
+	config.FillMissing()
+
+	model := flag.String("m", *config.Defaults.Model, "the model to use")
+	temperature := flag.Float64("t", *config.Defaults.Temp, "the temperature to use (see <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>)")
 	flag.Usage = func() {
 		errorf("usage: äh [flags] <prompt>\n")
 		flag.PrintDefaults()
@@ -64,20 +146,6 @@ func main() {
 			prompt += string(stdinInput)
 		}
 	}
-
-	configDir := func() string {
-		if alreadyConfiguredDir := os.Getenv("AEH_CONFIG_DIR"); alreadyConfiguredDir != "" {
-			return alreadyConfiguredDir
-		}
-		if configDir := os.Getenv("XDG_CONFIG_DIR"); configDir != "" {
-			return path.Join(configDir, "äh")
-		}
-		if homeDir := os.Getenv("HOME"); homeDir != "" {
-			return path.Join(homeDir, ".config", "äh")
-		}
-		return "./äh"
-	}()
-	historyFile := path.Join(configDir, "history.json")
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -136,12 +204,7 @@ func main() {
 	fmt.Println(gptAnswer)
 
 	// marshal the prompt and response to JSON and append it to the history file
-	if s, err := os.Stat(configDir); os.IsNotExist(err) {
-		os.Mkdir(configDir, 0700)
-	} else if !s.IsDir() {
-		errorf("config dir '%s' exists but is not a directory\n", configDir)
-		os.Exit(1)
-	}
+	ensureConfigDir()
 	marshaled, err := json.Marshal(PromptAndResponse{Prompt: prompt, Response: gptAnswer})
 	if err != nil {
 		// this should not happen, realistically
