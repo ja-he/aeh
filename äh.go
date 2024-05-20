@@ -118,12 +118,70 @@ func main() {
 
 	model := flag.String("m", *config.Defaults.Model, "the model to use")
 	temperature := flag.Float64("t", *config.Defaults.Temp, "the temperature to use (see <https://platform.openai.com/docs/api-reference/chat/create#chat/create-temperature>)")
+
+	history := flag.Bool("history", false, "show a history entry (instead of prompting); by default the last entry, but can be changed with -hist-show-ith")
+	histShowIth := flag.Int("hist-show-ith", -1, "show the ith history item (negative indices index from the back); requires -history to be given")
 	flag.Usage = func() {
 		errorf("usage: äh [flags] <prompt>\n")
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
+
+	if *history {
+		if *model != *config.Defaults.Model || *temperature != *config.Defaults.Temp {
+			errorf("you seem to have specified a model or a temperature, which is not valid with -history.\n")
+			os.Exit(1)
+		}
+
+		// read the history file
+		historyNDJSONReader, err := os.Open(historyFile)
+		if err != nil {
+			errorf("error opening history file (%s)\n", err.Error())
+			os.Exit(1)
+		}
+		d := json.NewDecoder(historyNDJSONReader)
+		var history []PromptAndResponse
+		for {
+			// Decode one JSON document.
+			var v PromptAndResponse
+			err := d.Decode(&v)
+
+			if err != nil {
+				// io.EOF is expected at end of stream.
+				if err != io.EOF {
+					errorf("error decoding history file (%s)\n", err.Error())
+					os.Exit(1)
+				}
+				break
+			}
+
+			// Do something with the value.
+			history = append(history, v)
+		}
+
+		var index int
+		if *histShowIth < 0 {
+			index = len(history) + (*histShowIth)
+		} else {
+			index = *histShowIth
+		}
+		if index < 0 || index >= len(history) {
+			errorf("index %d out of bounds\n", index)
+			os.Exit(1)
+		}
+
+		errorf(",-- BEGIN PROMPT ---\n")
+		errorf("%s\n", history[index].Prompt)
+		errorf("`-- END PROMPT ---\n")
+		fmt.Println(history[index].Response)
+
+		os.Exit(0)
+	} else if *histShowIth != -1 {
+		errorf("you seem to have provided a value for -hist-show-ith, which is invalid without history specified.\n")
+		os.Exit(1)
+	}
+
 	prompt := flag.Arg(0)
 	if prompt == "" {
 		errorf("no prompt given\n")
